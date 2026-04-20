@@ -1,0 +1,724 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TiffinTrack">
+    <title>TiffinTrack Pro Max</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons (Crash-Proof) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .pt-safe { padding-top: env(safe-area-inset-top); }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        body { 
+            background-color: #f3f4f6; 
+            -webkit-tap-highlight-color: transparent;
+            touch-action: pan-y;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-900 selection:bg-blue-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Safe Icon Component
+        const Icon = ({ name, size = 18, className = '' }) => {
+            const iconMap = {
+                'sunrise': 'fa-cloud-sun',
+                'sun': 'fa-sun',
+                'moon': 'fa-moon',
+                'utensils': 'fa-utensils',
+                'package': 'fa-bag-shopping',
+                'droplet': 'fa-droplet',
+                'archive-restore': 'fa-box-open',
+                'refresh-cw': 'fa-rotate-right',
+                'building': 'fa-building',
+                'info': 'fa-circle-info',
+                'chevron-up': 'fa-chevron-up',
+                'chevron-down': 'fa-chevron-down',
+                'pencil': 'fa-pen',
+                'trash-2': 'fa-trash',
+                'check': 'fa-check',
+                'users': 'fa-users',
+                'settings': 'fa-gear',
+                'home': 'fa-house',
+                'list': 'fa-list-check',
+                'plus-circle': 'fa-gear'
+            };
+            const faClass = iconMap[name] || 'fa-circle';
+            return <i className={`fa-solid ${faClass} ${className}`} style={{ fontSize: `${size}px` }}></i>;
+        };
+
+        const defaultApartments = [
+          { id: 1, name: 'Ganga Heights' },
+          { id: 2, name: 'Yamuna Enclave' }
+        ];
+
+        const defaultCustomers = [
+          { 
+            id: 1, apartmentId: 1, roomNumber: '101', customerName: 'Rahul Bhaiya', 
+            tiffinName: 'Rahul', 
+            subah: { tiffin: 0, parcel: 2, roti: 0, water: false, pickup: 0 }, 
+            dopahar: { tiffin: 2, parcel: 0, roti: 4, water: true, pickup: 0 }, 
+            raat: { tiffin: 2, parcel: 0, roti: 2, water: false, pickup: 0 } 
+          },
+          { 
+            id: 2, apartmentId: 1, roomNumber: '102', customerName: 'Amit', 
+            tiffinName: '', 
+            subah: { tiffin: 1, parcel: 1, roti: 0, water: false, pickup: 0 }, 
+            dopahar: { tiffin: 1, parcel: 0, roti: 2, water: false, pickup: 0 },
+            raat: { tiffin: 1, parcel: 0, roti: 0, water: false, pickup: 0 }
+          }
+        ];
+
+        function App() {
+          const [activeTab, setActiveTab] = useState('list'); 
+          const [activeShift, setActiveShift] = useState('dopahar'); 
+          const [apartments, setApartments] = useState([]);
+          const [customers, setCustomers] = useState([]);
+          
+          const [newAptName, setNewAptName] = useState('');
+          const [addAptId, setAddAptId] = useState('');
+          const [addRoom, setAddRoom] = useState('');
+          const [addCustName, setAddCustName] = useState('');
+          const [addTiffinName, setAddTiffinName] = useState('');
+
+          const [editingAptId, setEditingAptId] = useState(null);
+          const [editingAptNameState, setEditingAptNameState] = useState('');
+
+          const [editingRoomProfileId, setEditingRoomProfileId] = useState(null);
+          const [editProfileData, setEditProfileData] = useState({ roomNumber: '', customerName: '', tiffinName: '', apartmentId: '' });
+
+          const [expandedApts, setExpandedApts] = useState({});
+          const [unlockedRoomId, setUnlockedRoomId] = useState(null);
+
+          // Data Load
+          useEffect(() => {
+            const savedApts = localStorage.getItem('tiffin_apts_v9');
+            const savedCusts = localStorage.getItem('tiffin_custs_v9');
+            
+            if (savedApts) setApartments(JSON.parse(savedApts));
+            else {
+              const oldApts = localStorage.getItem('tiffin_apts_v8');
+              setApartments(oldApts ? JSON.parse(oldApts) : defaultApartments);
+            }
+
+            if (savedCusts) setCustomers(JSON.parse(savedCusts));
+            else {
+              const oldCusts = localStorage.getItem('tiffin_custs_v8');
+              setCustomers(oldCusts ? JSON.parse(oldCusts) : defaultCustomers);
+            }
+          }, []);
+
+          // Data Save
+          useEffect(() => {
+            if (apartments.length > 0) localStorage.setItem('tiffin_apts_v9', JSON.stringify(apartments));
+            if (apartments.length === 0) localStorage.setItem('tiffin_apts_v9', '[]');
+
+            if (customers.length > 0) localStorage.setItem('tiffin_custs_v9', JSON.stringify(customers));
+            if (customers.length === 0) localStorage.setItem('tiffin_custs_v9', '[]');
+          }, [apartments, customers]);
+
+          const toggleApartment = (aptId) => {
+              setExpandedApts(prev => ({ ...prev, [aptId]: !prev[aptId] }));
+          };
+
+          const updateItem = (custId, field, value) => {
+            setCustomers(customers.map(c => {
+              if (c.id === custId) {
+                const newValue = Math.max(0, c[activeShift][field] + value);
+                return { ...c, [activeShift]: { ...c[activeShift], [field]: newValue } };
+              }
+              return c;
+            }));
+          };
+
+          const toggleWater = (custId) => {
+            setCustomers(customers.map(c => {
+              if (c.id === custId) {
+                return { ...c, [activeShift]: { ...c[activeShift], water: !c[activeShift].water } };
+              }
+              return c;
+            }));
+          };
+
+          const addApartment = () => {
+            if (!newAptName.trim()) return;
+            setApartments([...apartments, { id: Date.now(), name: newAptName }]);
+            setNewAptName('');
+            alert("Building add ho gayi!");
+          };
+
+          const deleteApartment = (id) => {
+            if(window.confirm("WARNING: Is building ko hatane se iske saare room delete ho jayenge! Pakka hatana hai?")) {
+                setApartments(apartments.filter(a => a.id !== id));
+                setCustomers(customers.filter(c => c.apartmentId !== id));
+            }
+          };
+
+          const saveEditedApartment = (id) => {
+              if(!editingAptNameState.trim()) return;
+              setApartments(apartments.map(a => a.id === id ? { ...a, name: editingAptNameState } : a));
+              setEditingAptId(null);
+          };
+
+          const saveCustomer = () => {
+            if(!addAptId || !addRoom.trim()) {
+              alert("Apartment aur Room number bharna zaruri hai.");
+              return;
+            }
+            const newCust = {
+              id: Date.now(),
+              apartmentId: Number(addAptId),
+              roomNumber: addRoom,
+              customerName: addCustName,
+              tiffinName: addTiffinName,
+              subah: { tiffin: 0, parcel: 0, roti: 0, water: false, pickup: 0 },
+              dopahar: { tiffin: 0, parcel: 0, roti: 0, water: false, pickup: 0 },
+              raat: { tiffin: 0, parcel: 0, roti: 0, water: false, pickup: 0 }
+            };
+            setCustomers([...customers, newCust]);
+            setAddAptId(''); setAddRoom(''); setAddCustName(''); setAddTiffinName('');
+            setExpandedApts(prev => ({ ...prev, [newCust.apartmentId]: true }));
+            alert("Room add ho gaya! Delivery list me jaa kar 'Update' daba kar quantity set karein.");
+            setActiveTab('list');
+          };
+
+          const deleteCustomer = (id) => {
+            if(window.confirm("Kya aap is room ko permanently hatana chahte hain?")) {
+                setCustomers(customers.filter(c => c.id !== id));
+            }
+          };
+
+          const startEditingRoomProfile = (cust) => {
+              setEditingRoomProfileId(cust.id);
+              setEditProfileData({
+                  apartmentId: cust.apartmentId,
+                  roomNumber: cust.roomNumber,
+                  customerName: cust.customerName || '',
+                  tiffinName: cust.tiffinName || ''
+              });
+          };
+
+          const saveRoomProfile = () => {
+              if(!editProfileData.roomNumber.trim() || !editProfileData.apartmentId) {
+                  alert("Room No. aur Building zaruri hai.");
+                  return;
+              }
+              setCustomers(customers.map(c => {
+                  if(c.id === editingRoomProfileId) {
+                      return {
+                          ...c,
+                          apartmentId: Number(editProfileData.apartmentId),
+                          roomNumber: editProfileData.roomNumber,
+                          customerName: editProfileData.customerName,
+                          tiffinName: editProfileData.tiffinName
+                      };
+                  }
+                  return c;
+              }));
+              setEditingRoomProfileId(null);
+              alert("Room ki details update ho gayi!");
+          };
+
+          const resetPickups = () => {
+            if(window.confirm(`Kya aap ${getShiftName(activeShift)} ke saare 'Khali Tiffin (Wapsi)' ko 0 karna chahte hain?`)) {
+              setCustomers(customers.map(c => ({
+                ...c,
+                [activeShift]: { ...c[activeShift], pickup: 0 }
+              })));
+            }
+          };
+
+          const getShiftName = (shift) => {
+            if(shift === 'subah') return 'Subah';
+            if(shift === 'dopahar') return 'Dopahar';
+            return 'Raat';
+          };
+
+          const totalTiffins = customers.reduce((sum, c) => sum + c[activeShift].tiffin, 0);
+          const totalParcels = customers.reduce((sum, c) => sum + c[activeShift].parcel, 0);
+          const totalRotis = customers.reduce((sum, c) => sum + c[activeShift].roti, 0);
+          const totalBottles = customers.filter(c => c[activeShift].water).length;
+          const totalPickups = customers.reduce((sum, c) => sum + c[activeShift].pickup, 0);
+
+          let totalSimpleTiffins = 0;
+          let totalNamedTiffins = 0;
+          customers.forEach(c => {
+              if(c[activeShift].tiffin > 0) {
+                  if(c.tiffinName && c.tiffinName.trim() !== '') totalNamedTiffins += c[activeShift].tiffin;
+                  else totalSimpleTiffins += c[activeShift].tiffin;
+              }
+          });
+
+          const renderShiftSelector = () => (
+            <div className="flex bg-white p-2 gap-2 shadow-sm z-10 sticky top-[68px]">
+              <button onClick={() => { setActiveShift('subah'); setUnlockedRoomId(null); }} className={`flex-1 py-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors ${activeShift === 'subah' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-50 text-gray-500'}`}>
+                <Icon name="sunrise" size={20} />
+                <span className="text-[11px] font-bold">Subah</span>
+              </button>
+              <button onClick={() => { setActiveShift('dopahar'); setUnlockedRoomId(null); }} className={`flex-1 py-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors ${activeShift === 'dopahar' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : 'bg-gray-50 text-gray-500'}`}>
+                <Icon name="sun" size={20} />
+                <span className="text-[11px] font-bold">Dopahar</span>
+              </button>
+              <button onClick={() => { setActiveShift('raat'); setUnlockedRoomId(null); }} className={`flex-1 py-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors ${activeShift === 'raat' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-gray-50 text-gray-500'}`}>
+                <Icon name="moon" size={20} />
+                <span className="text-[11px] font-bold">Raat</span>
+              </button>
+            </div>
+          );
+
+          const renderHome = () => (
+            <div className="p-4 animate-fade-in pb-24">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">{getShiftName(activeShift)} Ki Report</h2>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1">
+                      <div className="bg-blue-200 p-1.5 rounded-lg text-blue-700"><Icon name="utensils" size={16}/></div>
+                      <span className="text-xs text-blue-800 font-bold">Total Tiffin</span>
+                  </div>
+                  <span className="text-2xl font-bold text-blue-900 mb-1">{totalTiffins}</span>
+                  <div className="text-[10px] font-semibold text-blue-700 bg-blue-100 p-1 rounded">
+                     Simple: {totalSimpleTiffins} | Naam: {totalNamedTiffins}
+                  </div>
+                </div>
+                
+                <div className="bg-green-50 border border-green-100 p-3 rounded-xl flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1">
+                      <div className="bg-green-200 p-1.5 rounded-lg text-green-700"><Icon name="package" size={16}/></div>
+                      <span className="text-xs text-green-800 font-bold">Total Parcel</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-900">{totalParcels}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-orange-800 font-semibold mb-1">Roti</span>
+                  <span className="text-xl font-bold text-orange-900">{totalRotis}</span>
+                </div>
+                <div className="bg-cyan-50 border border-cyan-100 p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-cyan-800 font-semibold mb-1">Pani</span>
+                  <span className="text-xl font-bold text-cyan-900">{totalBottles}</span>
+                </div>
+                <div className="bg-purple-50 border border-purple-100 p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-purple-800 font-semibold mb-1">Wapsi</span>
+                  <span className="text-xl font-bold text-purple-900">{totalPickups}</span>
+                </div>
+              </div>
+
+              <button onClick={resetPickups} className="w-full flex items-center justify-center gap-2 bg-white text-gray-600 py-3 rounded-xl mb-6 font-semibold border border-gray-200 shadow-sm">
+                <Icon name="refresh-cw" size={16} /> Agle din ke liye Khali Tiffin (0) karein
+              </button>
+            </div>
+          );
+
+          const renderList = () => (
+            <div className="p-4 pb-24">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">Delivery List</h2>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs p-3 rounded-xl mb-4 font-semibold flex gap-2">
+                 <Icon name="info" size={16} className="shrink-0 mt-0.5" />
+                 <span>List locked hai. Saman badhane ke liye room par <strong>"✏️ Update"</strong> dabayein. Building kholne ke liye uske naam par click karein.</span>
+              </div>
+
+              {apartments.length === 0 && (
+                  <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center text-gray-500">
+                     Building add karne ke liye niche 'Manage' par click karein.
+                  </div>
+              )}
+
+              {apartments.map(apt => {
+                const aptCusts = customers.filter(c => c.apartmentId === apt.id);
+                if (aptCusts.length === 0) return null;
+
+                const aParcels = aptCusts.reduce((sum, c) => sum + c[activeShift].parcel, 0);
+                const aRotis = aptCusts.reduce((sum, c) => sum + c[activeShift].roti, 0);
+                const aBottles = aptCusts.filter(c => c[activeShift].water).length;
+
+                let aptSimpleTiffins = 0;
+                let aptNamedList = [];
+
+                aptCusts.forEach(c => {
+                  if(c[activeShift].tiffin > 0) {
+                      if(c.tiffinName && c.tiffinName.trim() !== '') {
+                          aptNamedList.push(`${c.tiffinName} (${c[activeShift].tiffin})`);
+                      } else {
+                          aptSimpleTiffins += c[activeShift].tiffin;
+                      }
+                  }
+                });
+
+                const isExpanded = expandedApts[apt.id] || false;
+
+                return (
+                  <div key={apt.id} className="mb-6 shadow-sm rounded-xl transition-all">
+                    <div 
+                      className={`bg-slate-800 p-3 cursor-pointer ${isExpanded ? 'rounded-t-xl' : 'rounded-xl'}`}
+                      onClick={() => toggleApartment(apt.id)}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                          <h3 className="font-extrabold text-lg text-white flex items-center gap-2">
+                            <Icon name="building" size={16} className="text-indigo-400" /> {apt.name}
+                          </h3>
+                          <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} className="text-gray-400" />
+                      </div>
+                      
+                      <div className="bg-slate-900/50 p-2 rounded-lg">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 block">Building me Total le jana hai:</span>
+                        
+                        <div className="flex flex-col gap-1.5 text-xs font-bold mb-1.5">
+                           {(aptSimpleTiffins > 0 || aptNamedList.length > 0) && (
+                               <div className="flex flex-wrap gap-1.5">
+                                 {aptSimpleTiffins > 0 && <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded">🍱 Simple: {aptSimpleTiffins}</span>}
+                                 {aptNamedList.length > 0 && <span className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-1 rounded">🏷️ Naam: {aptNamedList.join(', ')}</span>}
+                               </div>
+                           )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5 text-xs font-bold">
+                           {aParcels > 0 && <span className="bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-1 rounded">🛍️ Parcel: {aParcels}</span>}
+                           {aRotis > 0 && <span className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-2 py-1 rounded">🫓 Roti: {aRotis}</span>}
+                           {aBottles > 0 && <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-1 rounded">💧 Pani: {aBottles}</span>}
+                           
+                           {aptSimpleTiffins === 0 && aptNamedList.length === 0 && aParcels === 0 && aRotis === 0 && aBottles === 0 && (
+                               <span className="text-gray-400 font-normal">Is building me is shift ka koi order nahi hai.</span>
+                           )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                        <div className="bg-white border border-gray-200 border-t-0 rounded-b-xl overflow-hidden">
+                          {aptCusts.map((c, index) => {
+                            const isUnlocked = unlockedRoomId === c.id;
+                            const shiftData = c[activeShift];
+                            const isEmpty = shiftData.tiffin === 0 && shiftData.parcel === 0 && shiftData.roti === 0 && !shiftData.water && shiftData.pickup === 0;
+
+                            return (
+                              <div key={c.id} className={`p-3 ${index !== aptCusts.length - 1 ? 'border-b border-gray-100' : ''} ${isEmpty && !isUnlocked ? 'bg-gray-50' : 'bg-white'}`}>
+                                
+                                <div className="flex justify-between items-center mb-2">
+                                  <div>
+                                    <span className="font-extrabold text-lg text-gray-900">Room: {c.roomNumber}</span>
+                                    {c.customerName && <span className="text-sm font-semibold text-gray-500 ml-2">({c.customerName})</span>}
+                                  </div>
+                                  
+                                  {isUnlocked ? (
+                                      <button onClick={() => setUnlockedRoomId(null)} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-green-200">
+                                          <Icon name="check" size={12}/> Save
+                                      </button>
+                                  ) : (
+                                      <button onClick={() => setUnlockedRoomId(c.id)} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200">
+                                          <Icon name="pencil" size={12}/> Update
+                                      </button>
+                                  )}
+                                </div>
+                                
+                                {c.tiffinName && shiftData.tiffin > 0 && (
+                                  <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 text-[11px] font-bold px-2 py-1 rounded-md mb-2 inline-flex items-center gap-1 shadow-sm">
+                                    🏷️ Dabbe par naam: <span className="text-black ml-1 text-sm">{c.tiffinName}</span>
+                                  </div>
+                                )}
+                                
+                                {/* VIEW MODE - Hide if empty */}
+                                {!isUnlocked && (
+                                    <div className="flex flex-col gap-2 mt-2">
+                                        {isEmpty ? (
+                                            <span className="text-xs text-gray-400 font-semibold">Koi saman nahi dena. Edit karne ke liye Update dabayein.</span>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-2">
+                                                {shiftData.tiffin > 0 && <span className="bg-blue-50 border border-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">🍱 {shiftData.tiffin}</span>}
+                                                {shiftData.parcel > 0 && <span className="bg-green-50 border border-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">🛍️ {shiftData.parcel}</span>}
+                                                {shiftData.roti > 0 && <span className="bg-orange-50 border border-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">🫓 Roti: {shiftData.roti}</span>}
+                                                {shiftData.water && <span className="bg-cyan-50 border border-cyan-100 text-cyan-800 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">💧 Pani</span>}
+                                                {shiftData.pickup > 0 && <span className="bg-purple-50 border border-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">📥 Wapsi: {shiftData.pickup}</span>}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* EDIT MODE */}
+                                {isUnlocked && (
+                                    <div className="space-y-3 mt-3 pt-3 border-t border-gray-100 animate-fade-in">
+                                      <div>
+                                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1 block">Is shift me kya dena hai:</span>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          
+                                          <div className="flex items-center justify-between bg-blue-50/50 border border-blue-100 rounded-lg p-1.5">
+                                            <span className="text-xs font-semibold text-gray-700">🍱 Tiffin</span>
+                                            <div className="flex items-center gap-1">
+                                              <button onClick={() => updateItem(c.id, 'tiffin', -1)} className="w-7 h-7 bg-white rounded shadow-sm text-red-500 font-bold">-</button>
+                                              <span className="w-4 text-center font-bold text-sm">{shiftData.tiffin}</span>
+                                              <button onClick={() => updateItem(c.id, 'tiffin', 1)} className="w-7 h-7 bg-white rounded shadow-sm text-green-500 font-bold">+</button>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center justify-between bg-green-50/50 border border-green-100 rounded-lg p-1.5">
+                                            <span className="text-xs font-semibold text-gray-700">🛍️ Parcel</span>
+                                            <div className="flex items-center gap-1">
+                                              <button onClick={() => updateItem(c.id, 'parcel', -1)} className="w-7 h-7 bg-white rounded shadow-sm text-red-500 font-bold">-</button>
+                                              <span className="w-4 text-center font-bold text-sm">{shiftData.parcel}</span>
+                                              <button onClick={() => updateItem(c.id, 'parcel', 1)} className="w-7 h-7 bg-white rounded shadow-sm text-green-500 font-bold">+</button>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center justify-between bg-orange-50/50 border border-orange-100 rounded-lg p-1.5">
+                                            <span className="text-xs font-semibold text-gray-700">🫓 Roti</span>
+                                            <div className="flex items-center gap-1">
+                                              <button onClick={() => updateItem(c.id, 'roti', -1)} className="w-7 h-7 bg-white rounded shadow-sm text-red-500 font-bold">-</button>
+                                              <span className="w-4 text-center font-bold text-sm">{shiftData.roti}</span>
+                                              <button onClick={() => updateItem(c.id, 'roti', 1)} className="w-7 h-7 bg-white rounded shadow-sm text-green-500 font-bold">+</button>
+                                            </div>
+                                          </div>
+
+                                          <button 
+                                            onClick={() => toggleWater(c.id)}
+                                            className={`flex items-center justify-center gap-1 p-1.5 rounded-lg text-xs font-bold transition-colors ${shiftData.water ? 'bg-cyan-100 text-cyan-800 border border-cyan-300' : 'bg-white text-gray-400 border border-gray-200 shadow-sm'}`}
+                                          >
+                                            <Icon name="droplet" size={14} />
+                                            Pani Bottle
+                                          </button>
+
+                                        </div>
+                                      </div>
+
+                                      <div className="bg-purple-50 p-2 rounded-lg border border-purple-200 flex items-center justify-between">
+                                        <span className="text-sm font-bold text-purple-800 flex items-center gap-1">
+                                          <Icon name="archive-restore" size={14}/> Khali Tiffin (Wapsi)
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <button onClick={() => updateItem(c.id, 'pickup', -1)} className="w-8 h-8 bg-white rounded shadow-sm text-red-500 font-bold text-lg">-</button>
+                                          <span className="w-6 text-center font-bold text-lg text-purple-900">{shiftData.pickup}</span>
+                                          <button onClick={() => updateItem(c.id, 'pickup', 1)} className="w-8 h-8 bg-purple-600 rounded shadow-sm text-white font-bold text-lg">+</button>
+                                        </div>
+                                      </div>
+
+                                    </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+
+          const renderAdd = () => (
+            <div className="p-4 pb-24">
+              <h2 className="text-2xl font-bold mb-6 text-gray-800">Room Add / Manage Karein</h2>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
+                <h3 className="font-bold text-lg mb-4 border-b pb-2 text-blue-800">Naya Room Jodein</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Apartment Select Karein</label>
+                    <select 
+                      className="w-full mt-1 p-3 bg-gray-50 border border-gray-300 rounded-lg font-semibold"
+                      value={addAptId} onChange={(e) => setAddAptId(e.target.value)}
+                    >
+                      <option value="">Chuniye...</option>
+                      {apartments.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">Room / Flat</label>
+                        <input 
+                          type="text" placeholder="Jaise: 101" 
+                          className="w-full mt-1 p-3 bg-gray-50 border border-gray-300 rounded-lg font-semibold"
+                          value={addRoom} onChange={(e) => setAddRoom(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">Customer Naam</label>
+                        <input 
+                          type="text" placeholder="Jaise: Rahul" 
+                          className="w-full mt-1 p-3 bg-gray-50 border border-gray-300 rounded-lg font-semibold"
+                          value={addCustName} onChange={(e) => setAddCustName(e.target.value)}
+                        />
+                      </div>
+                  </div>
+                  
+                  <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                    <label className="text-xs font-bold text-yellow-800 uppercase flex items-center gap-1">
+                       🏷️ Tiffin Par Naam
+                    </label>
+                    <input 
+                      type="text" placeholder="Jaise: Ramesh (Optional)" 
+                      className="w-full mt-2 p-3 bg-white border border-yellow-300 rounded-lg font-bold text-yellow-900 placeholder-yellow-400"
+                      value={addTiffinName} onChange={(e) => setAddTiffinName(e.target.value)}
+                    />
+                  </div>
+
+                  <button onClick={saveCustomer} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-md text-lg">
+                    Room Add Karein
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
+                <h3 className="font-bold text-lg mb-4 border-b pb-2 text-indigo-800 flex items-center gap-2">
+                    <Icon name="users" size={18}/> Purane Room Edit Karein
+                </h3>
+                
+                {customers.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-2">Koi room add nahi hai.</p>
+                ) : (
+                    <div className="space-y-3">
+                      {customers.map(cust => {
+                        const apt = apartments.find(a => a.id === cust.apartmentId);
+                        const aptName = apt ? apt.name : 'Unknown';
+
+                        return (
+                          <div key={cust.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            {editingRoomProfileId === cust.id ? (
+                                <div className="space-y-3">
+                                  <select className="w-full p-2 text-sm bg-white border border-gray-300 rounded-md font-semibold" value={editProfileData.apartmentId} onChange={(e) => setEditProfileData({...editProfileData, apartmentId: e.target.value})}>
+                                      {apartments.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                  </select>
+                                  <div className="flex gap-2">
+                                      <input type="text" className="w-1/3 p-2 text-sm bg-white border border-gray-300 rounded-md" placeholder="Room" value={editProfileData.roomNumber} onChange={(e) => setEditProfileData({...editProfileData, roomNumber: e.target.value})} />
+                                      <input type="text" className="w-2/3 p-2 text-sm bg-white border border-gray-300 rounded-md" placeholder="Naam" value={editProfileData.customerName} onChange={(e) => setEditProfileData({...editProfileData, customerName: e.target.value})} />
+                                  </div>
+                                  <input type="text" className="w-full p-2 text-sm bg-yellow-50 border border-yellow-300 rounded-md" placeholder="Tiffin par naam (Optional)" value={editProfileData.tiffinName} onChange={(e) => setEditProfileData({...editProfileData, tiffinName: e.target.value})} />
+                                  <div className="flex justify-end gap-2 mt-2">
+                                      <button onClick={() => setEditingRoomProfileId(null)} className="px-3 py-1 bg-gray-400 text-white text-xs rounded-md font-bold">Cancel</button>
+                                      <button onClick={saveRoomProfile} className="px-4 py-1 bg-green-600 text-white text-xs rounded-md font-bold">Save</button>
+                                  </div>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="font-bold text-sm text-gray-800">{aptName} - Room {cust.roomNumber}</div>
+                                        {cust.customerName && <div className="text-xs text-gray-600">{cust.customerName}</div>}
+                                        {cust.tiffinName && <div className="text-[10px] font-bold text-yellow-700 mt-1">🏷️ Tiffin: {cust.tiffinName}</div>}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => startEditingRoomProfile(cust)} className="text-blue-500 bg-blue-50 p-1.5 rounded-md"><Icon name="pencil" size={14}/></button>
+                                        <button onClick={() => deleteCustomer(cust.id)} className="text-red-500 bg-red-50 p-1.5 rounded-md"><Icon name="trash-2" size={14}/></button>
+                                    </div>
+                                </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                )}
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                <h3 className="font-bold text-lg mb-4 border-b pb-2 text-purple-800">Naya Apartment Jodein</h3>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Building ka naam..." className="flex-1 p-3 bg-gray-50 border border-gray-300 rounded-lg font-semibold" value={newAptName} onChange={(e) => setNewAptName(e.target.value)} />
+                  <button onClick={addApartment} className="px-5 bg-purple-600 text-white font-bold rounded-lg shadow-sm">Add</button>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mt-6">
+                <h3 className="font-bold text-lg mb-4 border-b pb-2 text-gray-800 flex items-center gap-2">
+                    <Icon name="settings" size={18}/> Apartments Manage Karein
+                </h3>
+                {apartments.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-2">Koi apartment nahi hai.</p>
+                ) : (
+                    <div className="space-y-3">
+                      {apartments.map(apt => (
+                        <div key={apt.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          {editingAptId === apt.id ? (
+                            <div className="flex-1 flex gap-2">
+                              <input type="text" className="flex-1 p-2 text-sm bg-white border border-blue-300 rounded-md font-semibold" value={editingAptNameState} onChange={(e) => setEditingAptNameState(e.target.value)} />
+                              <button onClick={() => saveEditedApartment(apt.id)} className="px-3 bg-green-600 text-white text-sm rounded-md font-bold shadow-sm">Save</button>
+                              <button onClick={() => setEditingAptId(null)} className="px-2 bg-gray-400 text-white text-sm rounded-md font-bold shadow-sm">X</button>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="font-bold text-gray-800">{apt.name}</span>
+                              <div className="flex gap-4">
+                                <button onClick={() => { setEditingAptId(apt.id); setEditingAptNameState(apt.name); }} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded-md"><Icon name="pencil" size={16}/></button>
+                                <button onClick={() => deleteApartment(apt.id)} className="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded-md"><Icon name="trash-2" size={16}/></button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                )}
+              </div>
+            </div>
+          );
+
+          return (
+            <div className="min-h-screen bg-gray-100 font-sans sm:max-w-md sm:mx-auto sm:border-x sm:border-gray-300 relative shadow-2xl">
+              <div className="bg-slate-900 pt-safe px-4 sticky top-0 z-20 flex flex-col justify-end h-[88px] pb-4 shadow-md">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                      Tiffin<span className="text-blue-400">Track</span>
+                    </h1>
+                    <span className="bg-green-900 text-green-300 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 border border-green-700">
+                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div> Offline
+                    </span>
+                </div>
+              </div>
+
+              {renderShiftSelector()}
+
+              <div className="overflow-y-auto h-[calc(100vh-190px)]">
+                {activeTab === 'home' && renderHome()}
+                {activeTab === 'list' && renderList()}
+                {activeTab === 'add' && renderAdd()}
+              </div>
+
+              <div className="fixed bottom-0 left-0 right-0 sm:max-w-md sm:mx-auto bg-white border-t border-gray-200 pb-safe shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-30">
+                <div className="flex justify-around items-center p-2">
+                  <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center p-2 w-20 ${activeTab === 'home' ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <Icon name="home" size={20} className={activeTab === 'home' ? 'text-blue-600' : ''} />
+                    <span className="text-[10px] mt-1 font-bold">Report</span>
+                  </button>
+                  <button onClick={() => setActiveTab('list')} className={`flex flex-col items-center p-2 w-20 ${activeTab === 'list' ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <Icon name="list" size={20} />
+                    <span className="text-[10px] mt-1 font-bold">Deliveries</span>
+                  </button>
+                  <button onClick={() => setActiveTab('add')} className={`flex flex-col items-center p-2 w-20 ${activeTab === 'add' ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <Icon name="plus-circle" size={20} />
+                    <span className="text-[10px] mt-1 font-bold">Manage</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
